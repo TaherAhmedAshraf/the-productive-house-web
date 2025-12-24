@@ -11,6 +11,10 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3001;
 
+// Database connection
+import connectDB from './lib/db';
+connectDB();
+
 app.use(cors());
 app.use(express.json());
 
@@ -24,6 +28,6 @@ app.use('/orders', ordersRouter);
 app.use('/users', usersRouter);
 app.use('/admin', adminRouter);
 
-app.listen(port, () => {
+app.listen(Number(port), '0.0.0.0', () => {
     console.log(`Server is running on port ${port}`);
 });

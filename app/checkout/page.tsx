@@ -5,6 +5,8 @@ import Footer from '../components/Footer';
 import { useCart } from '../context/CartContext';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { createOrder } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 
 interface FormData {
     // Contact Information
@@ -34,7 +36,9 @@ interface FormData {
 export default function CheckoutPage() {
     const { cart, cartTotal, clearCart } = useCart();
     const router = useRouter();
+    const { user } = useAuth();
     const [step, setStep] = useState(1); // 1: Information, 2: Shipping, 3: Payment
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [formData, setFormData] = useState<FormData>({
         email: '',
         firstName: '',
@@ -65,19 +69,55 @@ export default function CheckoutPage() {
         }));
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
         if (step < 3) {
             setStep(step + 1);
         } else {
-            // Process payment (in production, integrate with payment gateway)
-            alert('Order placed successfully! (Demo mode)');
-            clearCart();
-            router.push('/');
+            if (!user) {
+                alert('Please login to place an order');
+                // Redirect to login with return url
+                // Note: simple redirect for now
+                router.push('/login');
+                return;
+            }
+
+            try {
+                setIsSubmitting(true);
+                await createOrder({
+                    userId: user.uid,
+                    items: cart.map(item => ({
+                        productId: item.id,
+                        name: item.name,
+                        price: item.price,
+                        quantity: item.quantity,
+                        image: item.image
+                    })),
+                    shippingAddress: {
+                        name: `${formData.firstName} ${formData.lastName}`,
+                        street: `${formData.address}${formData.apartment ? ', ' + formData.apartment : ''}`,
+                        city: formData.city,
+                        zip: formData.postalCode,
+                        country: formData.country,
+                        phone: formData.phone
+                    },
+                    total: finalTotal
+                });
+
+                alert('Order placed successfully!');
+                clearCart();
+                router.push('/profile');
+            } catch (error) {
+                console.error('Failed to create order:', error);
+                alert('Failed to place order. Please try again.');
+            } finally {
+                setIsSubmitting(false);
+            }
         }
     };
 
+    // ... Rest of the file handling rendered UI
     if (cart.length === 0) {
         return (
             <div className="min-h-screen flex flex-col">
@@ -117,8 +157,8 @@ export default function CheckoutPage() {
                                     <div className="flex flex-col items-center flex-1">
                                         <div
                                             className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-colors ${step >= s.num
-                                                    ? 'bg-[#1d2a48] text-white'
-                                                    : 'bg-gray-200 text-gray-500'
+                                                ? 'bg-[#1d2a48] text-white'
+                                                : 'bg-gray-200 text-gray-500'
                                                 }`}
                                         >
                                             {s.num}
@@ -346,7 +386,7 @@ export default function CheckoutPage() {
 
                                             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
                                                 <p className="text-sm text-yellow-800">
-                                                    <strong>Demo Mode:</strong> This is a demonstration. No real payment will be processed.
+                                                    <strong>Demo Mode:</strong> No real payment will be processed.
                                                 </p>
                                             </div>
 
@@ -438,9 +478,10 @@ export default function CheckoutPage() {
                                         )}
                                         <button
                                             type="submit"
-                                            className="flex-1 bg-[#1d2a48] text-white py-3 rounded text-sm uppercase tracking-wider hover:bg-[#56cfe1] transition-colors"
+                                            disabled={isSubmitting}
+                                            className="flex-1 bg-[#1d2a48] text-white py-3 rounded text-sm uppercase tracking-wider hover:bg-[#56cfe1] transition-colors disabled:opacity-70"
                                         >
-                                            {step === 3 ? 'Place Order' : 'Continue'}
+                                            {step === 3 ? (isSubmitting ? 'Processing...' : 'Place Order') : 'Continue'}
                                         </button>
                                     </div>
                                 </form>

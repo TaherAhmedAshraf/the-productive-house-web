@@ -6,24 +6,64 @@ import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import Link from 'next/link';
-import { userOrders } from '../data/orders';
+import { getMyOrders, getWishlist, toggleWishlist } from '../lib/api';
+import { useCart } from '../context/CartContext';
 
 export default function ProfilePage() {
-    const { user, userProfile, loading, logout, updateUserProfile } = useAuth();
+    const { user, userProfile, loading, logout, updateUserProfile, refreshProfile } = useAuth();
+    const { addToCart } = useCart();
     const router = useRouter();
     const [activeTab, setActiveTab] = useState('profile');
+    const [orders, setOrders] = useState<any[]>([]);
+    const [wishlistItems, setWishlistItems] = useState<any[]>([]);
+    const [wishlistLoading, setWishlistLoading] = useState(false);
 
     const [displayName, setDisplayName] = useState('');
     const [isEditing, setIsEditing] = useState(false);
     const [saveLoading, setSaveLoading] = useState(false);
 
     useEffect(() => {
-        if (!loading && !user) {
-            router.push('/login');
-        } else if (userProfile) {
-            setDisplayName(userProfile.displayName || '');
+        if (!loading) {
+            if (!user) {
+                router.push('/login');
+            } else {
+                if (userProfile) {
+                    setDisplayName(userProfile.displayName || '');
+                }
+                // Fetch orders using the real API
+                getMyOrders(user.uid).then(data => {
+                    setOrders(data);
+                });
+
+                // Fetch wishlist
+                if (activeTab === 'wishlist') {
+                    fetchWishlist();
+                }
+            }
         }
-    }, [user, loading, router, userProfile]);
+    }, [user, loading, router, userProfile, activeTab]);
+
+    const fetchWishlist = async () => {
+        setWishlistLoading(true);
+        try {
+            const data = await getWishlist();
+            setWishlistItems(data.data || []);
+        } catch (error) {
+            console.error('Error fetching wishlist:', error);
+        } finally {
+            setWishlistLoading(false);
+        }
+    };
+
+    const handleRemoveFromWishlist = async (productId: string) => {
+        try {
+            await toggleWishlist(productId);
+            setWishlistItems(prev => prev.filter(item => item._id !== productId));
+            if (refreshProfile) refreshProfile();
+        } catch (error) {
+            console.error('Error removing from wishlist:', error);
+        }
+    };
 
     const handleUpdateProfile = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -83,8 +123,8 @@ export default function ProfilePage() {
                                             <button
                                                 onClick={() => setActiveTab('profile')}
                                                 className={`w-full text-left px-4 py-2 rounded font-medium transition-all ${activeTab === 'profile'
-                                                        ? 'bg-gray-50 text-[#1d2a48] border-l-4 border-[#56cfe1]'
-                                                        : 'text-gray-600 hover:bg-gray-50'
+                                                    ? 'bg-gray-50 text-[#1d2a48] border-l-4 border-[#56cfe1]'
+                                                    : 'text-gray-600 hover:bg-gray-50'
                                                     }`}
                                             >
                                                 Profile Information
@@ -94,8 +134,8 @@ export default function ProfilePage() {
                                             <button
                                                 onClick={() => setActiveTab('orders')}
                                                 className={`w-full text-left px-4 py-2 rounded font-medium transition-all ${activeTab === 'orders'
-                                                        ? 'bg-gray-50 text-[#1d2a48] border-l-4 border-[#56cfe1]'
-                                                        : 'text-gray-600 hover:bg-gray-50'
+                                                    ? 'bg-gray-50 text-[#1d2a48] border-l-4 border-[#56cfe1]'
+                                                    : 'text-gray-600 hover:bg-gray-50'
                                                     }`}
                                             >
                                                 Order History
@@ -105,11 +145,16 @@ export default function ProfilePage() {
                                             <button
                                                 onClick={() => setActiveTab('wishlist')}
                                                 className={`w-full text-left px-4 py-2 rounded font-medium transition-all ${activeTab === 'wishlist'
-                                                        ? 'bg-gray-50 text-[#1d2a48] border-l-4 border-[#56cfe1]'
-                                                        : 'text-gray-600 hover:bg-gray-50'
+                                                    ? 'bg-gray-50 text-[#1d2a48] border-l-4 border-[#56cfe1]'
+                                                    : 'text-gray-600 hover:bg-gray-50'
                                                     }`}
                                             >
                                                 Wishlist
+                                                {(userProfile?.wishlist?.length ?? 0) > 0 && (
+                                                    <span className="ml-2 px-2 py-0.5 bg-[#56cfe1] text-white text-xs rounded-full">
+                                                        {userProfile?.wishlist?.length}
+                                                    </span>
+                                                )}
                                             </button>
                                         </li>
                                         <li className="pt-4 mt-4 border-t border-gray-100">
@@ -170,8 +215,8 @@ export default function ProfilePage() {
                                                     onChange={(e) => setDisplayName(e.target.value)}
                                                     disabled={!isEditing}
                                                     className={`w-full px-4 py-2 border rounded-lg transition-colors ${isEditing
-                                                            ? 'border-gray-300 focus:ring-2 focus:ring-[#56cfe1] focus:border-transparent'
-                                                            : 'border-gray-200 bg-gray-50 text-gray-700'
+                                                        ? 'border-gray-300 focus:ring-2 focus:ring-[#56cfe1] focus:border-transparent'
+                                                        : 'border-gray-200 bg-gray-50 text-gray-700'
                                                         }`}
                                                 />
                                             </div>
@@ -205,7 +250,7 @@ export default function ProfilePage() {
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="bg-gray-50 p-4 rounded-lg text-center cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => setActiveTab('orders')}>
                                                 <span className="block text-3xl font-bold text-[#56cfe1] mb-1">
-                                                    {userOrders.length}
+                                                    {orders.length}
                                                 </span>
                                                 <span className="text-sm text-gray-600">Total Orders</span>
                                             </div>
@@ -225,15 +270,17 @@ export default function ProfilePage() {
                                 <div className="space-y-6 animate-fade-in">
                                     <h2 className="text-xl font-bold text-[#1d2a48]">Order History</h2>
 
-                                    {userOrders.length > 0 ? (
+                                    {orders.length > 0 ? (
                                         <div className="space-y-4">
-                                            {userOrders.map((order) => (
-                                                <div key={order.id} className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+                                            {orders.map((order) => (
+                                                <div key={order._id} className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
                                                     <div className="p-4 bg-gray-50 border-b border-gray-100 flex flex-wrap justify-between items-center gap-4">
                                                         <div className="flex gap-6 text-sm">
                                                             <div>
                                                                 <span className="block text-gray-500">Order Placed</span>
-                                                                <span className="font-medium text-[#1d2a48]">{order.date}</span>
+                                                                <span className="font-medium text-[#1d2a48]">
+                                                                    {new Date(order.createdAt).toLocaleDateString()}
+                                                                </span>
                                                             </div>
                                                             <div>
                                                                 <span className="block text-gray-500">Total</span>
@@ -241,18 +288,18 @@ export default function ProfilePage() {
                                                             </div>
                                                             <div>
                                                                 <span className="block text-gray-500">Order #</span>
-                                                                <span className="font-medium text-[#1d2a48]">{order.id}</span>
+                                                                <span className="font-medium text-[#1d2a48]">{order._id.slice(-6).toUpperCase()}</span>
                                                             </div>
                                                         </div>
                                                         <div className="flex items-center gap-4">
-                                                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${order.status === 'Delivered' ? 'bg-green-100 text-green-800' :
-                                                                    order.status === 'Processing' ? 'bg-yellow-100 text-yellow-800' :
-                                                                        'bg-gray-100 text-gray-800'
+                                                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${order.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                                                                order.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
+                                                                    'bg-gray-100 text-gray-800'
                                                                 }`}>
                                                                 {order.status}
                                                             </span>
                                                             <Link
-                                                                href={`/profile/orders/${order.id}`}
+                                                                href={`/profile/orders/${order._id}`}
                                                                 className="text-sm font-medium text-[#1d2a48] hover:text-[#56cfe1] border border-gray-300 hover:border-[#56cfe1] px-4 py-1.5 rounded-full bg-white transition-colors"
                                                             >
                                                                 View Details
@@ -261,7 +308,7 @@ export default function ProfilePage() {
                                                     </div>
 
                                                     <div className="p-4">
-                                                        {order.items.map((item, idx) => (
+                                                        {order.items.map((item: any, idx: number) => (
                                                             <div key={idx} className="flex items-start gap-4 py-4 first:pt-0 last:pb-0 border-b last:border-0 border-gray-100">
                                                                 <div className="w-16 h-16 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
                                                                     <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
@@ -298,16 +345,72 @@ export default function ProfilePage() {
                             {activeTab === 'wishlist' && (
                                 <div className="space-y-6 animate-fade-in">
                                     <h2 className="text-xl font-bold text-[#1d2a48]">My Wishlist</h2>
-                                    <div className="text-center py-12 bg-white rounded-lg shadow-sm">
-                                        <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                                        </svg>
-                                        <h3 className="text-lg font-medium text-gray-900">Your wishlist is empty</h3>
-                                        <p className="text-gray-500 mt-1 mb-6">Save items you love for later.</p>
-                                        <Link href="/shop" className="px-6 py-2 bg-[#1d2a48] text-white rounded-lg hover:bg-[#56cfe1] transition-colors">
-                                            Browse Shop
-                                        </Link>
-                                    </div>
+                                    {wishlistLoading ? (
+                                        <div className="flex justify-center py-12">
+                                            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[#1d2a48]"></div>
+                                        </div>
+                                    ) : wishlistItems.length > 0 ? (
+                                        <div className="grid gap-4">
+                                            {wishlistItems.map((item) => (
+                                                <div key={item._id} className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden flex transform transition-all hover:shadow-md">
+                                                    <Link href={`/product/${item._id}`} className="w-24 h-24 sm:w-32 sm:h-32 bg-gray-100 flex-shrink-0">
+                                                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                                                    </Link>
+                                                    <div className="flex-1 p-4 flex flex-col justify-between min-w-0">
+                                                        <div className="flex justify-between items-start gap-4">
+                                                            <div className="min-w-0">
+                                                                <Link href={`/product/${item._id}`}>
+                                                                    <h3 className="font-bold text-[#1d2a48] hover:text-[#56cfe1] transition-colors truncate">{item.name}</h3>
+                                                                </Link>
+                                                                <p className="text-sm text-gray-500">{item.category}</p>
+                                                            </div>
+                                                            <p className="font-bold text-[#1d2a48] whitespace-nowrap">£{item.price.toFixed(2)}</p>
+                                                        </div>
+                                                        <div className="flex justify-between items-center mt-4">
+                                                            <div className="flex gap-4">
+                                                                <Link
+                                                                    href={`/product/${item._id}`}
+                                                                    className="text-xs font-medium uppercase tracking-wider text-[#56cfe1] hover:text-[#1d2a48] transition-colors"
+                                                                >
+                                                                    View Product
+                                                                </Link>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        addToCart({
+                                                                            id: item._id,
+                                                                            name: item.name,
+                                                                            price: item.price,
+                                                                            image: item.image,
+                                                                        });
+                                                                    }}
+                                                                    className="text-xs font-medium uppercase tracking-wider text-[#1d2a48] hover:text-[#56cfe1] transition-colors"
+                                                                >
+                                                                    Add to Cart
+                                                                </button>
+                                                            </div>
+                                                            <button
+                                                                onClick={() => handleRemoveFromWishlist(item._id)}
+                                                                className="text-xs text-red-400 hover:text-red-600 font-medium transition-colors"
+                                                            >
+                                                                Remove
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-12 bg-white rounded-lg shadow-sm">
+                                            <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                                            </svg>
+                                            <h3 className="text-lg font-medium text-gray-900">Your wishlist is empty</h3>
+                                            <p className="text-gray-500 mt-1 mb-6">Save items you love for later.</p>
+                                            <Link href="/shop" className="px-6 py-2 bg-[#1d2a48] text-white rounded-lg hover:bg-[#56cfe1] transition-colors">
+                                                Browse Shop
+                                            </Link>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 

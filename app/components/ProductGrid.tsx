@@ -2,10 +2,23 @@
 
 import { useState } from 'react';
 import { useCart } from '../context/CartContext';
-import { products } from '../data/products';
 import Link from 'next/link';
+import { useAuth } from '../context/AuthContext';
+import { toggleWishlist } from '../lib/api';
+import { useRouter } from 'next/navigation';
 
-export default function ProductGrid() {
+export default function ProductGrid({ products }: { products: any[] }) {
+  if (!products || products.length === 0) {
+    return (
+      <section className="py-16 bg-white">
+        <div className="container mx-auto px-4 text-center">
+          <h2 className="text-3xl lg:text-4xl font-bold text-[#1d2a48] mb-4">Our Collection</h2>
+          <p className="text-[#696969]">No products found. Please check back later.</p>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="py-16 bg-white">
       <div className="container mx-auto px-4">
@@ -16,9 +29,9 @@ export default function ProductGrid() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-          {products.slice(0, 8).map((product) => (
-            <ProductCard key={product.id} product={product} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
+          {products.map((product) => (
+            <ProductCard key={product._id} product={product} />
           ))}
         </div>
 
@@ -38,14 +51,34 @@ export default function ProductGrid() {
 function ProductCard({ product }: { product: any }) {
   const [isHovered, setIsHovered] = useState(false);
   const { addToCart } = useCart();
+  const { user, userProfile, refreshProfile } = useAuth();
+  const router = useRouter();
 
-  const handleAddToCart = () => {
+  const isWishlisted = userProfile?.wishlist?.includes(product._id);
+
+  const handleAddToCart = (e: React.MouseEvent) => {
+    e.preventDefault();
     addToCart({
-      id: product.id,
+      id: product._id,
       name: product.name,
       price: product.price,
       image: product.image,
     });
+  };
+
+  const handleToggleWishlist = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
+    try {
+      await toggleWishlist(product._id);
+      if (refreshProfile) refreshProfile();
+    } catch (error) {
+      console.error('Error toggling wishlist:', error);
+    }
   };
 
   return (
@@ -54,12 +87,35 @@ function ProductCard({ product }: { product: any }) {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <Link href={`/product/${product.id}`} className="block relative overflow-hidden bg-gray-100 aspect-[3/4] mb-4">
-        <img
-          src={product.image}
-          alt={product.name}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-        />
+      <div className="relative overflow-hidden bg-gray-100 aspect-[3/4] mb-4">
+        <Link href={`/product/${product._id}`} className="block w-full h-full">
+          <img
+            src={product.image || ''}
+            alt={product.name || 'Product'}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        </Link>
+
+        {/* Wishlist Button */}
+        <button
+          onClick={handleToggleWishlist}
+          className={`absolute top-4 right-4 z-10 p-2 rounded-full shadow-md bg-white transition-all duration-300 ${isWishlisted ? 'text-red-500' : 'text-gray-400 hover:text-red-500'
+            }`}
+        >
+          <svg
+            className="w-5 h-5"
+            fill={isWishlisted ? 'currentColor' : 'none'}
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+            />
+          </svg>
+        </button>
 
         {product.badge && (
           <span className="absolute top-4 left-4 bg-[#1d2a48] text-white text-xs uppercase px-3 py-1 tracking-wider">
@@ -67,19 +123,19 @@ function ProductCard({ product }: { product: any }) {
           </span>
         )}
 
-        <div className={`absolute inset-0 bg-black bg-opacity-0 transition-all duration-300 flex items-center justify-center ${isHovered ? 'bg-opacity-20' : ''}`}>
+        <div className={`absolute inset-0 bg-black pointer-events-none bg-opacity-0 transition-all duration-300 flex items-center justify-center ${isHovered ? 'bg-opacity-20' : ''}`}>
           {isHovered && (
-            <span className="bg-white text-[#1d2a48] px-6 py-3 text-sm uppercase tracking-wider hover:bg-[#56cfe1] hover:text-white transition-colors duration-300">
-              Quick View
+            <span className="bg-white text-[#1d2a48] px-6 py-3 text-sm uppercase tracking-wider">
+              View Details
             </span>
           )}
         </div>
-      </Link>
+      </div>
 
       <div className="text-center">
-        <Link href={`/product/${product.id}`}>
+        <Link href={`/product/${product._id}`}>
           <h3 className="text-sm font-medium text-[#2c2823] mb-2 hover:text-[#56cfe1] transition-colors">
-            {product.name}
+            {product.name || 'Product'}
           </h3>
         </Link>
 
@@ -100,12 +156,12 @@ function ProductCard({ product }: { product: any }) {
           </div>
         )}
 
-        <p className="text-[#696969] font-bold mb-3">£{product.price.toFixed(2)}</p>
+        <p className="text-[#696969] font-bold mb-3">£{(product.price || 0).toFixed(2)}</p>
       </div>
 
       <button
         onClick={handleAddToCart}
-        className="w-full mt-4 border border-[#1d2a48] text-[#1d2a48] py-3 text-sm uppercase tracking-wider hover:bg-[#1d2a48] hover:text-white transition-colors duration-300"
+        className="w-full mt-2 border border-[#1d2a48] text-[#1d2a48] py-3 text-sm uppercase tracking-wider hover:bg-[#1d2a48] hover:text-white transition-colors duration-300"
       >
         Add to Cart
       </button>

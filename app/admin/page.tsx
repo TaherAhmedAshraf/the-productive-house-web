@@ -1,17 +1,52 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { getAdminStats, getAllOrders } from '../lib/api';
+import Link from 'next/link';
+
 export default function AdminDashboard() {
-    const stats = [
-        { name: 'Total Revenue', value: '£45,231.89', change: '+20.1%', trend: 'up' },
-        { name: 'Active Orders', value: '142', change: '+3.2%', trend: 'up' },
-        { name: 'Total Customers', value: '1,230', change: '+12.5%', trend: 'up' },
-        { name: 'Products Stock', value: '450', change: '-2.4%', trend: 'down' },
+    const [stats, setStats] = useState({
+        revenue: { total: 0, growth: 0 },
+        activeOrders: 0,
+        customers: { total: 0, newThisMonth: 0 },
+        lowStockProducts: 0
+    });
+    const [recentOrders, setRecentOrders] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        Promise.all([
+            getAdminStats(),
+            getAllOrders()
+        ]).then(([statsData, ordersData]) => {
+            setStats(statsData);
+            setRecentOrders((ordersData.data || []).slice(0, 5));
+            setLoading(false);
+        }).catch(err => {
+            console.error(err);
+            setLoading(false);
+        });
+    }, []);
+
+    const statsCards = [
+        { name: 'Total Revenue', value: `£${stats.revenue.total.toFixed(2)}`, change: `+${stats.revenue.growth}%`, trend: 'up' },
+        { name: 'Active Orders', value: stats.activeOrders.toString(), change: '+3.2%', trend: 'up' },
+        { name: 'Total Customers', value: stats.customers.total.toString(), change: `+${stats.customers.newThisMonth}`, trend: 'up' },
+        { name: 'Low Stock Products', value: stats.lowStockProducts.toString(), change: '-2.4%', trend: 'down' },
     ];
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#1d2a48]"></div>
+            </div>
+        );
+    }
 
     return (
         <div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                {stats.map((stat) => (
+                {statsCards.map((stat) => (
                     <div key={stat.name} className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
                         <h3 className="text-sm font-medium text-gray-500">{stat.name}</h3>
                         <div className="mt-2 flex items-baseline justify-between">
@@ -30,7 +65,7 @@ export default function AdminDashboard() {
                 <div className="lg:col-span-2 bg-white rounded-lg shadow-sm border border-gray-100">
                     <div className="p-6 border-b border-gray-100 flex justify-between items-center">
                         <h3 className="font-bold text-[#1d2a48]">Recent Orders</h3>
-                        <button className="text-sm text-[#56cfe1] hover:text-[#1d2a48]">View All</button>
+                        <Link href="/admin/orders" className="text-sm text-[#56cfe1] hover:text-[#1d2a48]">View All</Link>
                     </div>
                     <div className="p-6">
                         <div className="overflow-x-auto">
@@ -45,18 +80,24 @@ export default function AdminDashboard() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-50">
-                                    {[101, 102, 103, 104, 105].map((id, index) => (
-                                        <tr key={id} className="group hover:bg-gray-50 transition-colors">
-                                            <td className="py-4 text-[#1d2a48] font-medium">#{id}</td>
-                                            <td className="py-4">John Doe</td>
-                                            <td className="py-4 text-gray-500">Dec {12 - index}, 2025</td>
-                                            <td className="py-4 font-medium">£{Math.floor(Math.random() * 100) + 20}.99</td>
+                                    {recentOrders.map((order) => (
+                                        <tr key={order._id} className="group hover:bg-gray-50 transition-colors">
+                                            <td className="py-4 text-[#1d2a48] font-medium">
+                                                <Link href={`/admin/orders/${order._id}`} className="hover:text-[#56cfe1]">
+                                                    #{order._id.slice(-6)}
+                                                </Link>
+                                            </td>
+                                            <td className="py-4">{order.shippingAddress?.name || 'N/A'}</td>
+                                            <td className="py-4 text-gray-500">
+                                                {new Date(order.createdAt).toLocaleDateString()}
+                                            </td>
+                                            <td className="py-4 font-medium">£{order.total.toFixed(2)}</td>
                                             <td className="py-4">
-                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${index === 0 ? 'bg-yellow-100 text-yellow-800' :
-                                                        index === 2 ? 'bg-red-100 text-red-800' :
+                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                                        order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
                                                             'bg-green-100 text-green-800'
                                                     }`}>
-                                                    {index === 0 ? 'Pending' : index === 2 ? 'Cancelled' : 'Completed'}
+                                                    {order.status}
                                                 </span>
                                             </td>
                                         </tr>

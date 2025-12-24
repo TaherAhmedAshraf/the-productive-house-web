@@ -8,8 +8,9 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 
 export default function LoginPage() {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
+    // Default admin credentials for testing/demo
+    const [email, setEmail] = useState('admin@theproductivehouse.com');
+    const [password, setPassword] = useState('admin123');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const router = useRouter();

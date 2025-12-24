@@ -1,23 +1,51 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Header from '../../components/Header';
 import Footer from '../../components/Footer';
-import { products } from '../../data/products';
+import { getProduct, toggleWishlist } from '../../lib/api';
 import { useCart } from '../../context/CartContext';
+import { useAuth } from '../../context/AuthContext';
 import Link from 'next/link';
 
 export default function ProductDetailPage() {
     const params = useParams();
     const router = useRouter();
     const { addToCart } = useCart();
-    const productId = parseInt(params.id as string);
-    const product = products.find(p => p.id === productId);
+    const productId = params.id as string;
+
+    const [product, setProduct] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (productId) {
+            setLoading(true);
+            getProduct(productId).then((res) => {
+                setProduct(res.data);
+                setLoading(false);
+            }).catch(err => {
+                console.error(err);
+                setLoading(false);
+            });
+        }
+    }, [productId]);
 
     const [selectedImage, setSelectedImage] = useState(0);
     const [quantity, setQuantity] = useState(1);
     const [activeTab, setActiveTab] = useState<'description' | 'features' | 'specs'>('description');
+
+    if (loading) {
+        return (
+            <div className="min-h-screen flex flex-col">
+                <Header />
+                <main className="flex-1 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#1d2a48]"></div>
+                </main>
+                <Footer />
+            </div>
+        );
+    }
 
     if (!product) {
         return (
@@ -37,16 +65,35 @@ export default function ProductDetailPage() {
     }
 
     const images = product.images || [product.image];
-    const relatedProducts = products.filter(p => p.category === product.category && p.id !== product.id).slice(0, 4);
+    // Mock related products or fetch if API supports it. For now empty.
+    const relatedProducts: any[] = [];
+
+    const { user, userProfile, refreshProfile } = useAuth();
+
+    const isWishlisted = userProfile?.wishlist?.includes(product._id);
 
     const handleAddToCart = () => {
         for (let i = 0; i < quantity; i++) {
             addToCart({
-                id: product.id,
+                id: product._id,
                 name: product.name,
                 price: product.price,
                 image: product.image,
             });
+        }
+    };
+
+    const handleToggleWishlist = async () => {
+        if (!user) {
+            router.push('/login');
+            return;
+        }
+
+        try {
+            await toggleWishlist(product._id);
+            if (refreshProfile) refreshProfile();
+        } catch (error) {
+            console.error('Error toggling wishlist:', error);
         }
     };
 
@@ -84,13 +131,13 @@ export default function ProductDetailPage() {
 
                             {images.length > 1 && (
                                 <div className="grid grid-cols-4 gap-4">
-                                    {images.map((image, index) => (
+                                    {images.map((image: string, index: number) => (
                                         <button
                                             key={index}
                                             onClick={() => setSelectedImage(index)}
                                             className={`aspect-square rounded-lg overflow-hidden border-2 transition-all ${selectedImage === index
-                                                    ? 'border-[#56cfe1] scale-95'
-                                                    : 'border-gray-200 hover:border-gray-300'
+                                                ? 'border-[#56cfe1] scale-95'
+                                                : 'border-gray-200 hover:border-gray-300'
                                                 }`}
                                         >
                                             <img
@@ -175,9 +222,23 @@ export default function ProductDetailPage() {
                                     >
                                         Add to Cart
                                     </button>
-                                    <button className="px-6 border-2 border-[#1d2a48] text-[#1d2a48] hover:bg-gray-50 transition-colors">
-                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                                    <button
+                                        onClick={handleToggleWishlist}
+                                        className={`px-6 border-2 transition-colors ${isWishlisted ? 'border-red-500 text-red-500 bg-red-50' : 'border-[#1d2a48] text-[#1d2a48] hover:bg-gray-50'
+                                            }`}
+                                    >
+                                        <svg
+                                            className="w-6 h-6"
+                                            fill={isWishlisted ? 'currentColor' : 'none'}
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                                            />
                                         </svg>
                                     </button>
                                 </div>
@@ -214,8 +275,8 @@ export default function ProductDetailPage() {
                                 <button
                                     onClick={() => setActiveTab('description')}
                                     className={`py-4 border-b-2 transition-colors ${activeTab === 'description'
-                                            ? 'border-[#56cfe1] text-[#1d2a48] font-medium'
-                                            : 'border-transparent text-gray-600 hover:text-[#1d2a48]'
+                                        ? 'border-[#56cfe1] text-[#1d2a48] font-medium'
+                                        : 'border-transparent text-gray-600 hover:text-[#1d2a48]'
                                         }`}
                                 >
                                     Description
@@ -224,8 +285,8 @@ export default function ProductDetailPage() {
                                     <button
                                         onClick={() => setActiveTab('features')}
                                         className={`py-4 border-b-2 transition-colors ${activeTab === 'features'
-                                                ? 'border-[#56cfe1] text-[#1d2a48] font-medium'
-                                                : 'border-transparent text-gray-600 hover:text-[#1d2a48]'
+                                            ? 'border-[#56cfe1] text-[#1d2a48] font-medium'
+                                            : 'border-transparent text-gray-600 hover:text-[#1d2a48]'
                                             }`}
                                     >
                                         Features
@@ -235,8 +296,8 @@ export default function ProductDetailPage() {
                                     <button
                                         onClick={() => setActiveTab('specs')}
                                         className={`py-4 border-b-2 transition-colors ${activeTab === 'specs'
-                                                ? 'border-[#56cfe1] text-[#1d2a48] font-medium'
-                                                : 'border-transparent text-gray-600 hover:text-[#1d2a48]'
+                                            ? 'border-[#56cfe1] text-[#1d2a48] font-medium'
+                                            : 'border-transparent text-gray-600 hover:text-[#1d2a48]'
                                             }`}
                                     >
                                         Specifications
@@ -254,7 +315,7 @@ export default function ProductDetailPage() {
 
                             {activeTab === 'features' && product.features && (
                                 <div className="grid md:grid-cols-2 gap-4">
-                                    {product.features.map((feature, index) => (
+                                    {product.features.map((feature: string, index: number) => (
                                         <div key={index} className="flex items-start gap-3">
                                             <svg className="w-5 h-5 text-[#56cfe1] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -267,7 +328,7 @@ export default function ProductDetailPage() {
 
                             {activeTab === 'specs' && product.specifications && (
                                 <div className="grid md:grid-cols-2 gap-6">
-                                    {Object.entries(product.specifications).map(([key, value]) => (
+                                    {Object.entries(product.specifications).map(([key, value]: [string, any]) => (
                                         <div key={key} className="flex justify-between border-b border-gray-200 pb-3">
                                             <span className="font-medium text-[#2c2823] capitalize">
                                                 {key.replace(/([A-Z])/g, ' $1').trim()}:

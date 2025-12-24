@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import { products } from '../data/products';
+import { getProducts } from '../lib/api';
 import { CATEGORIES, Category } from '../types/product';
 import { useCart } from '../context/CartContext';
 import Link from 'next/link';
@@ -11,10 +11,22 @@ import Link from 'next/link';
 type SortOption = 'featured' | 'price-low' | 'price-high' | 'name' | 'rating';
 
 export default function ShopPage() {
+    const [products, setProducts] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
     const [selectedCategory, setSelectedCategory] = useState<Category>('All Products');
     const [sortBy, setSortBy] = useState<SortOption>('featured');
     const [priceRange, setPriceRange] = useState<[number, number]>([0, 100]);
     const { addToCart } = useCart();
+
+    useEffect(() => {
+        getProducts().then((res) => {
+            setProducts(res.data || []);
+            setLoading(false);
+        }).catch(err => {
+            console.error(err);
+            setLoading(false);
+        });
+    }, []);
 
     // Filter and sort products
     const filteredProducts = useMemo(() => {
@@ -44,7 +56,7 @@ export default function ShopPage() {
         }
 
         return filtered;
-    }, [selectedCategory, sortBy, priceRange]);
+    }, [selectedCategory, sortBy, priceRange, products]);
 
     return (
         <div className="min-h-screen flex flex-col">
@@ -62,129 +74,135 @@ export default function ShopPage() {
                 </div>
 
                 <div className="container mx-auto px-4 py-12">
-                    <div className="grid lg:grid-cols-4 gap-8">
-                        {/* Filters Sidebar */}
-                        <aside className="lg:col-span-1">
-                            <div className="bg-white rounded-lg shadow-sm p-6 sticky top-24">
-                                <h2 className="text-xl font-bold text-[#1d2a48] mb-6">Filters</h2>
+                    {loading ? (
+                        <div className="flex justify-center items-center h-64">
+                            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#1d2a48]"></div>
+                        </div>
+                    ) : (
+                        <div className="grid lg:grid-cols-4 gap-8">
+                            {/* Filters Sidebar */}
+                            <aside className="lg:col-span-1">
+                                <div className="bg-white rounded-lg shadow-sm p-6 sticky top-24">
+                                    <h2 className="text-xl font-bold text-[#1d2a48] mb-6">Filters</h2>
 
-                                {/* Category Filter */}
-                                <div className="mb-8">
-                                    <h3 className="font-medium text-[#2c2823] mb-4">Category</h3>
-                                    <div className="space-y-2">
-                                        {CATEGORIES.map((category) => (
-                                            <button
-                                                key={category}
-                                                onClick={() => setSelectedCategory(category)}
-                                                className={`block w-full text-left px-4 py-2 rounded transition-colors ${selectedCategory === category
+                                    {/* Category Filter */}
+                                    <div className="mb-8">
+                                        <h3 className="font-medium text-[#2c2823] mb-4">Category</h3>
+                                        <div className="space-y-2">
+                                            {CATEGORIES.map((category) => (
+                                                <button
+                                                    key={category}
+                                                    onClick={() => setSelectedCategory(category)}
+                                                    className={`block w-full text-left px-4 py-2 rounded transition-colors ${selectedCategory === category
                                                         ? 'bg-[#1d2a48] text-white'
                                                         : 'hover:bg-gray-100 text-gray-700'
-                                                    }`}
-                                            >
-                                                {category}
-                                            </button>
-                                        ))}
+                                                        }`}
+                                                >
+                                                    {category}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
-                                </div>
 
-                                {/* Price Range */}
-                                <div className="mb-8">
-                                    <h3 className="font-medium text-[#2c2823] mb-4">Price Range</h3>
-                                    <div className="space-y-4">
-                                        <div>
-                                            <input
-                                                type="range"
-                                                min="0"
-                                                max="100"
-                                                value={priceRange[1]}
-                                                onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value)])}
-                                                className="w-full accent-[#56cfe1]"
-                                            />
-                                            <div className="flex justify-between text-sm text-gray-600 mt-2">
-                                                <span>£{priceRange[0]}</span>
-                                                <span>£{priceRange[1]}</span>
+                                    {/* Price Range */}
+                                    <div className="mb-8">
+                                        <h3 className="font-medium text-[#2c2823] mb-4">Price Range</h3>
+                                        <div className="space-y-4">
+                                            <div>
+                                                <input
+                                                    type="range"
+                                                    min="0"
+                                                    max="100"
+                                                    value={priceRange[1]}
+                                                    onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value)])}
+                                                    className="w-full accent-[#56cfe1]"
+                                                />
+                                                <div className="flex justify-between text-sm text-gray-600 mt-2">
+                                                    <span>£{priceRange[0]}</span>
+                                                    <span>£{priceRange[1]}</span>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
 
-                                {/* In Stock Only */}
-                                <div className="mb-6">
-                                    <label className="flex items-center cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            defaultChecked
-                                            className="w-4 h-4 text-[#56cfe1] border-gray-300 rounded focus:ring-[#56cfe1]"
-                                        />
-                                        <span className="ml-2 text-sm text-gray-700">In Stock Only</span>
-                                    </label>
-                                </div>
+                                    {/* In Stock Only */}
+                                    <div className="mb-6">
+                                        <label className="flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                defaultChecked
+                                                className="w-4 h-4 text-[#56cfe1] border-gray-300 rounded focus:ring-[#56cfe1]"
+                                            />
+                                            <span className="ml-2 text-sm text-gray-700">In Stock Only</span>
+                                        </label>
+                                    </div>
 
-                                {/* Reset Filters */}
-                                <button
-                                    onClick={() => {
-                                        setSelectedCategory('All Products');
-                                        setPriceRange([0, 100]);
-                                        setSortBy('featured');
-                                    }}
-                                    className="w-full border border-gray-300 text-gray-700 py-2 rounded hover:bg-gray-50 transition-colors text-sm"
-                                >
-                                    Reset Filters
-                                </button>
-                            </div>
-                        </aside>
-
-                        {/* Products Grid */}
-                        <div className="lg:col-span-3">
-                            {/* Sort and Results Count */}
-                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-                                <p className="text-gray-600">
-                                    Showing <span className="font-medium text-[#1d2a48]">{filteredProducts.length}</span> products
-                                </p>
-
-                                <div className="flex items-center gap-2">
-                                    <label className="text-sm text-gray-600">Sort by:</label>
-                                    <select
-                                        value={sortBy}
-                                        onChange={(e) => setSortBy(e.target.value as SortOption)}
-                                        className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#56cfe1]"
-                                    >
-                                        <option value="featured">Featured</option>
-                                        <option value="price-low">Price: Low to High</option>
-                                        <option value="price-high">Price: High to Low</option>
-                                        <option value="name">Name: A to Z</option>
-                                        <option value="rating">Highest Rated</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            {/* Products Grid */}
-                            {filteredProducts.length === 0 ? (
-                                <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-                                    <svg className="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                                    </svg>
-                                    <h3 className="text-xl font-bold text-[#2c2823] mb-2">No products found</h3>
-                                    <p className="text-gray-600 mb-6">Try adjusting your filters to see more results.</p>
+                                    {/* Reset Filters */}
                                     <button
                                         onClick={() => {
                                             setSelectedCategory('All Products');
                                             setPriceRange([0, 100]);
+                                            setSortBy('featured');
                                         }}
-                                        className="text-[#56cfe1] hover:text-[#1d2a48] transition-colors font-medium"
+                                        className="w-full border border-gray-300 text-gray-700 py-2 rounded hover:bg-gray-50 transition-colors text-sm"
                                     >
-                                        Clear Filters
+                                        Reset Filters
                                     </button>
                                 </div>
-                            ) : (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    {filteredProducts.map((product) => (
-                                        <ProductCard key={product.id} product={product} onAddToCart={addToCart} />
-                                    ))}
+                            </aside>
+
+                            {/* Products Grid */}
+                            <div className="lg:col-span-3">
+                                {/* Sort and Results Count */}
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                                    <p className="text-gray-600">
+                                        Showing <span className="font-medium text-[#1d2a48]">{filteredProducts.length}</span> products
+                                    </p>
+
+                                    <div className="flex items-center gap-2">
+                                        <label className="text-sm text-gray-600">Sort by:</label>
+                                        <select
+                                            value={sortBy}
+                                            onChange={(e) => setSortBy(e.target.value as SortOption)}
+                                            className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#56cfe1]"
+                                        >
+                                            <option value="featured">Featured</option>
+                                            <option value="price-low">Price: Low to High</option>
+                                            <option value="price-high">Price: High to Low</option>
+                                            <option value="name">Name: A to Z</option>
+                                            <option value="rating">Highest Rated</option>
+                                        </select>
+                                    </div>
                                 </div>
-                            )}
+
+                                {/* Products Grid */}
+                                {filteredProducts.length === 0 ? (
+                                    <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+                                        <svg className="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                                        </svg>
+                                        <h3 className="text-xl font-bold text-[#2c2823] mb-2">No products found</h3>
+                                        <p className="text-gray-600 mb-6">Try adjusting your filters to see more results.</p>
+                                        <button
+                                            onClick={() => {
+                                                setSelectedCategory('All Products');
+                                                setPriceRange([0, 100]);
+                                            }}
+                                            className="text-[#56cfe1] hover:text-[#1d2a48] transition-colors font-medium"
+                                        >
+                                            Clear Filters
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        {filteredProducts.map((product) => (
+                                            <ProductCard key={product.id} product={product} onAddToCart={addToCart} />
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
             </main>
 
@@ -204,8 +222,8 @@ function ProductCard({ product, onAddToCart }: { product: any; onAddToCart: any 
         >
             <Link href={`/product/${product.id}`} className="block relative overflow-hidden aspect-[3/4]">
                 <img
-                    src={product.image}
-                    alt={product.name}
+                    src={product.image || ''}
+                    alt={product.name || 'Product'}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                 />
 
@@ -225,7 +243,7 @@ function ProductCard({ product, onAddToCart }: { product: any; onAddToCart: any 
             <div className="p-4">
                 <Link href={`/product/${product.id}`}>
                     <h3 className="font-medium text-[#2c2823] mb-2 hover:text-[#56cfe1] transition-colors line-clamp-2">
-                        {product.name}
+                        {product.name || 'Product'}
                     </h3>
                 </Link>
 
@@ -249,7 +267,7 @@ function ProductCard({ product, onAddToCart }: { product: any; onAddToCart: any 
                     )}
                 </div>
 
-                <p className="text-[#1d2a48] font-bold text-lg mb-3">£{product.price.toFixed(2)}</p>
+                <p className="text-[#1d2a48] font-bold text-lg mb-3">£{(product.price || 0).toFixed(2)}</p>
 
                 <div className="flex gap-2">
                     <Link

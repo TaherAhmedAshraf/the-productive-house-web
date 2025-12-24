@@ -1,8 +1,9 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { userOrders } from '../../../data/orders';
+import { getOrder } from '../../../lib/api';
 import Header from '../../../components/Header';
 import Footer from '../../../components/Footer';
 
@@ -10,9 +11,32 @@ export default function OrderDetailsPage() {
     const params = useParams();
     const router = useRouter();
     const orderId = params.id as string;
+    const [order, setOrder] = useState<any | null>(null);
+    const [loading, setLoading] = useState(true);
 
-    // Find the order
-    const order = userOrders.find(o => o.id === orderId);
+    useEffect(() => {
+        if (orderId) {
+            getOrder(orderId).then(data => {
+                setOrder(data);
+                setLoading(false);
+            }).catch(err => {
+                console.error(err);
+                setLoading(false);
+            });
+        }
+    }, [orderId]);
+
+    if (loading) {
+        return (
+            <div className="min-h-screen flex flex-col bg-gray-50">
+                <Header />
+                <main className="flex-1 container mx-auto px-4 py-12 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#1d2a48]"></div>
+                </main>
+                <Footer />
+            </div>
+        );
+    }
 
     if (!order) {
         return (
@@ -54,15 +78,15 @@ export default function OrderDetailsPage() {
                         <div className="p-6 md:p-8 border-b border-gray-100 bg-gray-50/50 flex flex-wrap justify-between items-start gap-4">
                             <div>
                                 <h1 className="text-2xl font-bold text-[#1d2a48] flex items-center gap-3">
-                                    Order #{order.id}
-                                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${order.status === 'Delivered' ? 'bg-green-100 text-green-800' :
-                                            order.status === 'Processing' ? 'bg-yellow-100 text-yellow-800' :
-                                                'bg-gray-100 text-gray-800'
+                                    Order #{order._id?.slice(-6).toUpperCase() || 'N/A'}
+                                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${order.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                                        order.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
+                                            'bg-gray-100 text-gray-800'
                                         }`}>
                                         {order.status}
                                     </span>
                                 </h1>
-                                <p className="text-gray-500 mt-1">Placed on {order.date}</p>
+                                <p className="text-gray-500 mt-1">Placed on {new Date(order.createdAt).toLocaleDateString()}</p>
                             </div>
 
                             <div className="text-right">
@@ -92,7 +116,7 @@ export default function OrderDetailsPage() {
                             <div className="md:col-span-2 p-6 md:p-8 border-r border-gray-100">
                                 <h2 className="font-bold text-[#1d2a48] mb-6">Items Ordered</h2>
                                 <div className="space-y-6">
-                                    {order.items.map((item, idx) => (
+                                    {order.items?.map((item: any, idx: number) => (
                                         <div key={idx} className="flex gap-4">
                                             <div className="w-20 h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
                                                 <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
@@ -103,7 +127,7 @@ export default function OrderDetailsPage() {
                                                         <h3 className="font-medium text-[#1d2a48]">{item.name}</h3>
                                                         <p className="text-sm text-gray-500 mt-1">Qty: {item.quantity}</p>
                                                     </div>
-                                                    <span className="font-medium text-[#1d2a48]">£{item.price.toFixed(2)}</span>
+                                                    <span className="font-medium text-[#1d2a48]">£{item.price?.toFixed(2)}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -111,21 +135,9 @@ export default function OrderDetailsPage() {
                                 </div>
 
                                 <div className="mt-8 pt-6 border-t border-gray-100">
-                                    <div className="flex justify-between py-2">
-                                        <span className="text-gray-600">Subtotal</span>
-                                        <span className="font-medium">£{(order.total - 15).toFixed(2)}</span>
-                                    </div>
-                                    <div className="flex justify-between py-2">
-                                        <span className="text-gray-600">Shipping</span>
-                                        <span className="font-medium">£5.00</span>
-                                    </div>
-                                    <div className="flex justify-between py-2">
-                                        <span className="text-gray-600">Tax</span>
-                                        <span className="font-medium">£10.00</span>
-                                    </div>
                                     <div className="flex justify-between py-3 mt-2 border-t border-gray-100 text-lg font-bold text-[#1d2a48]">
-                                        <span>Total</span>
-                                        <span>£{order.total.toFixed(2)}</span>
+                                        <span>Total Paid</span>
+                                        <span>£{order.total?.toFixed(2)}</span>
                                     </div>
                                 </div>
                             </div>
@@ -135,26 +147,16 @@ export default function OrderDetailsPage() {
                                 <div>
                                     <h3 className="font-bold text-[#1d2a48] mb-3">Shipping Address</h3>
                                     <address className="not-italic text-sm text-gray-600 space-y-1">
-                                        <p className="font-medium text-[#1d2a48]">{order.shippingAddress.name}</p>
-                                        <p>{order.shippingAddress.street}</p>
-                                        <p>{order.shippingAddress.city}, {order.shippingAddress.postcode}</p>
-                                        <p>{order.shippingAddress.country}</p>
+                                        <p className="font-medium text-[#1d2a48]">{order.shippingAddress?.name || 'N/A'}</p>
+                                        <p>{order.shippingAddress?.street}</p>
+                                        <p>{order.shippingAddress?.city}, {order.shippingAddress?.zip}</p>
+                                        <p>{order.shippingAddress?.country}</p>
                                     </address>
                                 </div>
 
                                 <div>
                                     <h3 className="font-bold text-[#1d2a48] mb-3">Billing Address</h3>
                                     <p className="text-sm text-gray-600">Same as shipping address</p>
-                                </div>
-
-                                <div>
-                                    <h3 className="font-bold text-[#1d2a48] mb-3">Payment Method</h3>
-                                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                                        <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
-                                            <path d="M2 10h20v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-9zm20-2V6a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v2h20z" />
-                                        </svg>
-                                        {order.paymentMethod}
-                                    </div>
                                 </div>
 
                                 <div className="pt-6 border-t border-gray-200">

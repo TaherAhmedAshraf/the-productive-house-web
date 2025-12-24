@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { products } from '../data/products';
-import { Product } from '../types/product';
+import { getProducts } from '../lib/api';
 
 interface SearchOverlayProps {
     isOpen: boolean;
@@ -12,7 +11,8 @@ interface SearchOverlayProps {
 
 export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
     const [searchTerm, setSearchTerm] = useState('');
-    const [results, setResults] = useState<Product[]>([]);
+    const [results, setResults] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
     const [isAnimating, setIsAnimating] = useState(false);
     const [shouldRender, setShouldRender] = useState(false);
@@ -21,11 +21,9 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
         if (isOpen) {
             setShouldRender(true);
             setTimeout(() => setIsAnimating(true), 10);
-            // Focus input after animation
             setTimeout(() => {
                 if (inputRef.current) inputRef.current.focus();
             }, 100);
-            // Prevent body scroll
             document.body.style.overflow = 'hidden';
         } else {
             setIsAnimating(false);
@@ -35,16 +33,27 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
     }, [isOpen]);
 
     useEffect(() => {
-        if (searchTerm.trim() === '') {
-            setResults([]);
-            return;
-        }
+        const fetchResults = async () => {
+            if (searchTerm.trim() === '') {
+                setResults([]);
+                return;
+            }
 
-        const filtered = products.filter((product) =>
-            product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            product.category.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-        setResults(filtered);
+            setLoading(true);
+            try {
+                const params = new URLSearchParams();
+                params.append('q', searchTerm);
+                const data = await getProducts(params);
+                setResults(data.data || []);
+            } catch (error) {
+                console.error('Search error:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        const debounceTimer = setTimeout(fetchResults, 300);
+        return () => clearTimeout(debounceTimer);
     }, [searchTerm]);
 
     const handleClose = () => {
@@ -89,6 +98,11 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
+                    {loading && (
+                        <div className="absolute right-16 top-1/2 -translate-y-1/2">
+                            <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-[#1d2a48]"></div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Results Area */}
@@ -111,19 +125,21 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                                 </div>
                             </div>
                         </div>
-                    ) : results.length === 0 ? (
+                    ) : results.length === 0 && !loading ? (
                         <div className="p-8 text-center text-gray-500">
                             <p>No products found for "{searchTerm}"</p>
                         </div>
                     ) : (
                         <div className="py-2">
-                            <p className="px-4 py-2 text-xs font-medium uppercase tracking-wider text-gray-400">
-                                Products ({results.length})
-                            </p>
+                            {results.length > 0 && (
+                                <p className="px-4 py-2 text-xs font-medium uppercase tracking-wider text-gray-400">
+                                    Products ({results.length})
+                                </p>
+                            )}
                             {results.map((product) => (
                                 <Link
-                                    key={product.id}
-                                    href={`/product/${product.id}`}
+                                    key={product._id}
+                                    href={`/product/${product._id}`}
                                     onClick={handleClose}
                                     className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors group"
                                 >

@@ -1,14 +1,29 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { getAdminCustomers } from '../../lib/api';
+
 export default function AdminCustomers() {
-    const customers = [
-        { id: 1, name: 'John Doe', email: 'john@example.com', orders: 12, spent: 450.50, status: 'Active', joined: '2024-01-15' },
-        { id: 2, name: 'Sarah Miller', email: 'sarah.m@example.com', orders: 5, spent: 145.00, status: 'Active', joined: '2024-03-22' },
-        { id: 3, name: 'James Thompson', email: 'j.thompson@test.com', orders: 1, spent: 32.50, status: 'Inactive', joined: '2024-05-10' },
-        { id: 4, name: 'Emily Wilson', email: 'emily.w@example.com', orders: 8, spent: 289.99, status: 'Active', joined: '2024-02-01' },
-        { id: 5, name: 'Michael Chen', email: 'm.chen@example.com', orders: 3, spent: 210.00, status: 'Active', joined: '2024-06-15' },
-        { id: 6, name: 'Jessica Brown', email: 'jess.brown@example.com', orders: 0, spent: 0.00, status: 'New', joined: '2025-12-08' },
-    ];
+    const [customers, setCustomers] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        getAdminCustomers().then((res) => {
+            setCustomers(res.data || []);
+            setLoading(false);
+        }).catch(err => {
+            console.error(err);
+            setLoading(false);
+        });
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#1d2a48]"></div>
+            </div>
+        );
+    }
 
     return (
         <div className="bg-white rounded-lg shadow-sm border border-gray-100">
@@ -32,38 +47,27 @@ export default function AdminCustomers() {
                         <tr>
                             <th className="px-6 py-4 font-medium text-gray-500">Customer</th>
                             <th className="px-6 py-4 font-medium text-gray-500">Contact</th>
-                            <th className="px-6 py-4 font-medium text-gray-500">Joined</th>
                             <th className="px-6 py-4 font-medium text-gray-500">Orders</th>
                             <th className="px-6 py-4 font-medium text-gray-500">Total Spent</th>
-                            <th className="px-6 py-4 font-medium text-gray-500">Status</th>
                             <th className="px-6 py-4 font-medium text-gray-500">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                         {customers.map((customer) => (
-                            <tr key={customer.id} className="hover:bg-gray-50">
+                            <tr key={customer.uid} className="hover:bg-gray-50">
                                 <td className="px-6 py-4">
                                     <div className="flex items-center gap-3">
                                         <div className="w-8 h-8 rounded-full bg-[#1d2a48] text-white flex items-center justify-center text-xs font-bold">
-                                            {customer.name.charAt(0)}
+                                            {customer.displayName?.charAt(0) || 'U'}
                                         </div>
-                                        <span className="font-medium text-[#1d2a48]">{customer.name}</span>
+                                        <span className="font-medium text-[#1d2a48]">{customer.displayName || 'Unknown'}</span>
                                     </div>
                                 </td>
                                 <td className="px-6 py-4 text-gray-600">{customer.email}</td>
-                                <td className="px-6 py-4 text-gray-500">{customer.joined}</td>
-                                <td className="px-6 py-4">{customer.orders}</td>
-                                <td className="px-6 py-4 font-medium">£{customer.spent.toFixed(2)}</td>
+                                <td className="px-6 py-4">{customer.totalOrders || 0}</td>
+                                <td className="px-6 py-4 font-medium">£{(customer.totalSpent || 0).toFixed(2)}</td>
                                 <td className="px-6 py-4">
-                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${customer.status === 'Active' ? 'bg-green-100 text-green-800' :
-                                            customer.status === 'New' ? 'bg-blue-100 text-blue-800' :
-                                                'bg-gray-100 text-gray-800'
-                                        }`}>
-                                        {customer.status}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <button className="text-[#56cfe1] hover:text-[#1d2a48] font-medium text-sm">Edit</button>
+                                    <button className="text-[#56cfe1] hover:text-[#1d2a48] font-medium text-sm">View</button>
                                 </td>
                             </tr>
                         ))}
@@ -71,12 +75,14 @@ export default function AdminCustomers() {
                 </table>
             </div>
 
+            {customers.length === 0 && (
+                <div className="text-center py-12">
+                    <p className="text-gray-500">No customers found</p>
+                </div>
+            )}
+
             <div className="p-4 border-t border-gray-100 flex justify-between items-center text-sm text-gray-500">
                 <span>Showing {customers.length} results</span>
-                <div className="flex gap-2">
-                    <button className="px-3 py-1 border border-gray-200 rounded hover:bg-gray-50 disabled:opacity-50" disabled>Previous</button>
-                    <button className="px-3 py-1 border border-gray-200 rounded hover:bg-gray-50 disabled" disabled>Next</button>
-                </div>
             </div>
         </div>
     );
