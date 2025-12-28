@@ -88,7 +88,7 @@ export default function CheckoutPage() {
                 await createOrder({
                     userId: user.uid,
                     items: cart.map(item => ({
-                        productId: item.id,
+                        productId: String(item.id),
                         name: item.name,
                         price: item.price,
                         quantity: item.quantity,

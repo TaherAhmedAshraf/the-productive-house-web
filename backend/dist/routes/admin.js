@@ -7,7 +7,11 @@ const express_1 = require("express");
 const Order_1 = __importDefault(require("../models/Order"));
 const User_1 = __importDefault(require("../models/User"));
 const Product_1 = __importDefault(require("../models/Product"));
+const auth_1 = require("../middleware/auth");
 const router = (0, express_1.Router)();
+// Apply authentication to all admin routes
+router.use(auth_1.verifyToken);
+router.use(auth_1.requireAdmin);
 // GET /admin/stats
 router.get('/stats', async (req, res) => {
     try {
@@ -53,6 +57,47 @@ router.get('/customers', async (req, res) => {
     catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to list customers' });
+    }
+});
+// GET /admin/orders
+router.get('/orders', async (req, res) => {
+    try {
+        const orders = await Order_1.default.find({})
+            .sort({ createdAt: -1 })
+            .lean();
+        // Since userId is a Firebase UID string, we manually fetch users
+        const userIds = [...new Set(orders.map(o => o.userId))];
+        const users = await User_1.default.find({ uid: { $in: userIds } }).select('displayName email uid').lean();
+        const userMap = new Map(users.map(u => [u.uid, u]));
+        const results = orders.map(o => ({
+            ...o,
+            user: userMap.get(o.userId)
+        }));
+        res.json({ data: results });
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch orders' });
+    }
+});
+// PATCH /admin/orders/:id/status
+router.patch('/orders/:id/status', async (req, res) => {
+    try {
+        const { status, trackingNumber } = req.body;
+        const updateData = { status };
+        if (trackingNumber) {
+            updateData.trackingNumber = trackingNumber;
+        }
+        const order = await Order_1.default.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true });
+        if (!order) {
+            res.status(404).json({ error: 'Order not found' });
+            return;
+        }
+        res.json(order);
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to update order status' });
     }
 });
 exports.default = router;

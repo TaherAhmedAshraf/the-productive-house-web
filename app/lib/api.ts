@@ -130,6 +130,7 @@ export async function createOrder(orderData: {
         city: string;
         zip: string;
         country: string;
+        phone?: string;
     };
     total: number;
 }) {
@@ -277,7 +278,7 @@ export async function getMe() {
     }
 }
 
-export async function updateUserProfile(profileData: Partial<UserProfile>) {
+export async function updateUserProfile(profileData: Partial<any>) {
     try {
         const headers = await getAuthHeaders();
         const res = await fetch(`${API_URL}/users/me`, {

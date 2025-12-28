@@ -5,12 +5,24 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const Product_1 = __importDefault(require("../models/Product"));
+const auth_1 = require("../middleware/auth");
 const router = (0, express_1.Router)();
-// GET /products
+// GET /products - Public
 router.get('/', async (req, res) => {
     try {
-        const products = await Product_1.default.find({}).sort({ createdAt: -1 });
-        // Mongoose result is already formatted, virtuals should be included if configured
+        const { q, category } = req.query;
+        let query = {};
+        if (q) {
+            query.$or = [
+                { name: { $regex: q, $options: 'i' } },
+                { category: { $regex: q, $options: 'i' } },
+                { description: { $regex: q, $options: 'i' } }
+            ];
+        }
+        if (category && category !== 'All Products') {
+            query.category = category;
+        }
+        const products = await Product_1.default.find(query).sort({ createdAt: -1 });
         res.json({ data: products });
     }
     catch (error) {
@@ -18,7 +30,7 @@ router.get('/', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch products' });
     }
 });
-// GET /products/:id
+// GET /products/:id - Public
 router.get('/:id', async (req, res) => {
     try {
         const product = await Product_1.default.findById(req.params.id);
@@ -32,10 +44,9 @@ router.get('/:id', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch product' });
     }
 });
-// POST /products (Admin)
-router.post('/', async (req, res) => {
+// POST /products (Admin) - Protected
+router.post('/', auth_1.verifyToken, auth_1.requireAdmin, async (req, res) => {
     try {
-        // categoryId -> category in Mongoose schema (assuming string)
         const { name, description, price, stock, categoryId, category, images, specifications } = req.body;
         const product = await Product_1.default.create({
             name,
@@ -43,8 +54,8 @@ router.post('/', async (req, res) => {
             price,
             stock,
             category: category || categoryId,
-            images: images || [], // Array
-            specifications: specifications || {}, // Object
+            images: images || [],
+            specifications: specifications || {},
             image: (images && images.length > 0) ? images[0] : ''
         });
         res.status(201).json(product);
@@ -54,8 +65,8 @@ router.post('/', async (req, res) => {
         res.status(500).json({ error: 'Failed to create product' });
     }
 });
-// PUT /products/:id (Admin)
-router.put('/:id', async (req, res) => {
+// PUT /products/:id (Admin) - Protected
+router.put('/:id', auth_1.verifyToken, auth_1.requireAdmin, async (req, res) => {
     try {
         const { name, description, price, stock, images, specifications, category } = req.body;
         const updateData = {};
@@ -86,6 +97,21 @@ router.put('/:id', async (req, res) => {
     catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to update product' });
+    }
+});
+// DELETE /products/:id (Admin) - Protected
+router.delete('/:id', auth_1.verifyToken, auth_1.requireAdmin, async (req, res) => {
+    try {
+        const product = await Product_1.default.findByIdAndDelete(req.params.id);
+        if (!product) {
+            res.status(404).json({ error: 'Product not found' });
+            return;
+        }
+        res.json({ message: 'Product deleted successfully', product });
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to delete product' });
     }
 });
 exports.default = router;

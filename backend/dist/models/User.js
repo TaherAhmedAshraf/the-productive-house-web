@@ -40,6 +40,7 @@ const UserSchema = new mongoose_1.Schema({
     displayName: { type: String },
     photoURL: { type: String },
     role: { type: String, enum: ['user', 'admin'], default: 'user' },
+    wishlist: [{ type: mongoose_1.Schema.Types.ObjectId, ref: 'Product' }],
 }, {
     timestamps: true
 });

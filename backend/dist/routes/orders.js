@@ -7,9 +7,11 @@ const express_1 = require("express");
 const mongoose_1 = __importDefault(require("mongoose"));
 const Order_1 = __importDefault(require("../models/Order"));
 const Product_1 = __importDefault(require("../models/Product"));
+const User_1 = __importDefault(require("../models/User"));
+const auth_1 = require("../middleware/auth");
 const router = (0, express_1.Router)();
-// POST /orders
-router.post('/', async (req, res) => {
+// POST /orders - Protected (requires authentication)
+router.post('/', auth_1.verifyToken, async (req, res) => {
     const session = await mongoose_1.default.startSession();
     session.startTransaction();
     try {
@@ -31,7 +33,7 @@ router.post('/', async (req, res) => {
                 userId,
                 items: items.map((item) => ({
                     productId: item.productId,
-                    name: item.name, // Assuming passed or fetched (fetching is safer but trying to match logic)
+                    name: item.name,
                     price: item.price,
                     quantity: item.quantity,
                     image: item.image
@@ -52,8 +54,8 @@ router.post('/', async (req, res) => {
         session.endSession();
     }
 });
-// GET /orders/my-orders
-router.get('/my-orders', async (req, res) => {
+// GET /orders/my-orders - Protected
+router.get('/my-orders', auth_1.verifyToken, async (req, res) => {
     try {
         const userId = req.query.userId;
         if (!userId) {
@@ -71,14 +73,21 @@ router.get('/my-orders', async (req, res) => {
 router.get('/:id', async (req, res) => {
     try {
         const order = await Order_1.default.findById(req.params.id)
-            .populate('items.productId'); // populate product details
+            .populate('items.productId')
+            .lean();
         if (!order) {
             res.status(404).json({ error: 'Order not found' });
             return;
         }
-        res.json(order);
+        // Attach user info (lookup by Firebase UID)
+        const user = await User_1.default.findOne({ uid: order.userId }).select('displayName email uid').lean();
+        res.json({
+            ...order,
+            user: user || null
+        });
     }
     catch (error) {
+        console.error(error);
         res.status(500).json({ error: 'Failed to fetch order' });
     }
 });

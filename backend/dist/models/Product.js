@@ -59,8 +59,7 @@ ProductSchema.virtual('inStock').get(function () {
 ProductSchema.set('toJSON', {
     virtuals: true,
     transform: (doc, ret) => {
-        delete ret._id;
-        delete ret.__v;
+        ret.id = ret._id;
         if (ret.specifications instanceof Map) {
             const specs = {};
             ret.specifications.forEach((value, key) => {
